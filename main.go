@@ -223,10 +223,10 @@ func processTestEvents(reader io.Reader) (*ReportData, error) {
 func generateMarkdownReport(data *ReportData) string {
 	var sb strings.Builder
 
-	// Generate header
-	sb.WriteString("# Test Summary Report\n\n")
+	// Generate header with emoji
+	sb.WriteString("# 🧪 Test Summary Report\n\n")
 
-	// Generate summary
+	// Generate summary with emojis
 	passPercentage := 0.0
 	passPercentageDisplay := "N/A"
 	if data.TotalTests > 0 {
@@ -234,27 +234,39 @@ func generateMarkdownReport(data *ReportData) string {
 		passPercentageDisplay = fmt.Sprintf("%.1f%%", passPercentage)
 	}
 
-	sb.WriteString("## Summary\n\n")
-	sb.WriteString(fmt.Sprintf("- **Total Tests:** %d\n", data.TotalTests))
-	sb.WriteString(fmt.Sprintf("- **Passed:** %d (%s)\n", data.PassedTests, passPercentageDisplay))
-	sb.WriteString(fmt.Sprintf("- **Failed:** %d\n", data.FailedTests))
-	sb.WriteString(fmt.Sprintf("- **Skipped:** %d\n", data.SkippedTests))
-	sb.WriteString(fmt.Sprintf("- **Total Duration:** %.2fs\n\n", data.TotalDuration))
+	sb.WriteString("## 📊 Summary\n\n")
+	sb.WriteString(fmt.Sprintf("- 🧪 **Total Tests:** %d\n", data.TotalTests))
+	sb.WriteString(fmt.Sprintf("- ✅ **Passed:** %d (%s)\n", data.PassedTests, passPercentageDisplay))
+	sb.WriteString(fmt.Sprintf("- ❌ **Failed:** %d\n", data.FailedTests))
+	sb.WriteString(fmt.Sprintf("- ⏭️ **Skipped:** %d\n", data.SkippedTests))
+	sb.WriteString(fmt.Sprintf("- ⏱️ **Total Duration:** %.2fs\n\n", data.TotalDuration))
 
-	// Visual pass/fail indicator
-	sb.WriteString("## Test Status\n\n")
-
-	// Create status badges
-	if data.FailedTests > 0 {
-		sb.WriteString("![Status](https://img.shields.io/badge/Status-FAILED-red)\n\n")
-	} else if data.SkippedTests == data.TotalTests {
-		sb.WriteString("![Status](https://img.shields.io/badge/Status-SKIPPED-yellow)\n\n")
-	} else {
-		sb.WriteString("![Status](https://img.shields.io/badge/Status-PASSED-brightgreen)\n\n")
+	// Add visual progress bar for pass rate
+	if data.TotalTests > 0 {
+		sb.WriteString("### Pass Rate Progress\n\n")
+		progressBar := generateProgressBar(passPercentage)
+		sb.WriteString(fmt.Sprintf("%s **%.1f%%**\n\n", progressBar, passPercentage))
 	}
 
+	// Visual pass/fail indicator with emojis
+	sb.WriteString("## 🎯 Test Status\n\n")
+
+	// Create status badges with celebration or warning emojis
+	if data.FailedTests > 0 {
+		sb.WriteString("⚠️ ![Status](https://img.shields.io/badge/Status-FAILED-red) ⚠️\n\n")
+		sb.WriteString("> 💔 Some tests failed. Please review the failed tests below.\n\n")
+	} else if data.SkippedTests == data.TotalTests {
+		sb.WriteString("⏸️ ![Status](https://img.shields.io/badge/Status-SKIPPED-yellow) ⏸️\n\n")
+		sb.WriteString("> ⚡ All tests were skipped.\n\n")
+	} else {
+		sb.WriteString("🎉 ![Status](https://img.shields.io/badge/Status-PASSED-brightgreen) 🎉\n\n")
+		sb.WriteString("> ✨ Excellent! All tests passed successfully!\n\n")
+	}
+
+	sb.WriteString("---\n\n")
+
 	// Create a table of test results
-	sb.WriteString("## Test Results\n\n")
+	sb.WriteString("## 📝 Test Results\n\n")
 	sb.WriteString("| Test | Status | Duration | Details |\n")
 	sb.WriteString("| ---- | ------ | -------- | ------- |\n")
 
@@ -322,9 +334,10 @@ func generateMarkdownReport(data *ReportData) string {
 	sb.WriteString("\n")
 
 	if data.FailedTests > 0 {
-		sb.WriteString("## Failed Tests Details\n\n")
+		sb.WriteString("## 🔴 Failed Tests Details\n\n")
 		sb.WriteString("<details>\n")
-		sb.WriteString("<summary>Click to expand failed test details</summary>\n\n")
+		sb.WriteString("<summary>💥 Click to expand failed test details</summary>\n\n")
+		sb.WriteString("<br>\n\n")
 
 		for _, testName := range data.SortedTestNames {
 			result := data.Results[testName]
@@ -346,18 +359,12 @@ func generateMarkdownReport(data *ReportData) string {
 					displayName = filepath.Base(displayName)
 				}
 
-				sb.WriteString(fmt.Sprintf("### %s\n\n", displayName))
+				sb.WriteString(fmt.Sprintf("### ❌ %s\n\n", displayName))
 
 				// Output for the main test
 				if result.Status == "FAIL" && len(result.Output) > 0 {
-					sb.WriteString("```go\n")
-					for _, line := range result.Output {
-						if strings.Contains(line, "FAIL") || strings.Contains(line, "Error") ||
-							strings.Contains(line, "panic:") || strings.Contains(line, "--- FAIL") {
-							sb.WriteString(fmt.Sprintf("%s\n", line))
-						}
-					}
-					sb.WriteString("```\n\n")
+					formattedOutput := formatFailureOutput(result.Output)
+					sb.WriteString(formattedOutput)
 				}
 
 				// Output for failed subtests
@@ -365,20 +372,15 @@ func generateMarkdownReport(data *ReportData) string {
 					subTest := data.Results[subTestName]
 					if subTest.Status == "FAIL" {
 						subTestDisplayName := subTestName[strings.LastIndex(subTestName, "/")+1:]
-						sb.WriteString(fmt.Sprintf("#### %s\n\n", subTestDisplayName))
+						sb.WriteString(fmt.Sprintf("#### ❌ %s\n\n", subTestDisplayName))
 
 						if len(subTest.Output) > 0 {
-							sb.WriteString("```go\n")
-							for _, line := range subTest.Output {
-								if strings.Contains(line, "FAIL") || strings.Contains(line, "Error") ||
-									strings.Contains(line, "panic:") || strings.Contains(line, "--- FAIL") {
-									sb.WriteString(fmt.Sprintf("%s\n", line))
-								}
-							}
-							sb.WriteString("```\n\n")
+							formattedOutput := formatFailureOutput(subTest.Output)
+							sb.WriteString(formattedOutput)
 						}
 					}
 				}
+				sb.WriteString("---\n\n")
 			}
 		}
 
@@ -387,9 +389,9 @@ func generateMarkdownReport(data *ReportData) string {
 	}
 
 	// Add duration metrics
-	sb.WriteString("## Test Durations\n\n")
+	sb.WriteString("## ⏱️ Test Durations\n\n")
 	sb.WriteString("<details>\n")
-	sb.WriteString("<summary>Click to expand test durations</summary>\n\n")
+	sb.WriteString("<summary>⚡ Click to expand test durations</summary>\n\n")
 	sb.WriteString("| Test | Duration |\n")
 	sb.WriteString("| ---- | -------- |\n")
 
@@ -466,8 +468,106 @@ func generateMarkdownReport(data *ReportData) string {
 	}
 
 	// Close the details tag
-	sb.WriteString("\n</details>\n")
-	sb.WriteString(fmt.Sprintf("Report generated at: %s\n", time.Now().Format("02/01/06-15:04:05")))
+	sb.WriteString("\n</details>\n\n")
+	sb.WriteString("---\n\n")
+	sb.WriteString(fmt.Sprintf("📅 **Report generated at:** %s\n", time.Now().Format("2006-01-02 15:04:05 MST")))
+
+	return sb.String()
+}
+
+// generateProgressBar creates a visual progress bar based on percentage
+func generateProgressBar(percentage float64) string {
+	barLength := 20
+	filled := int(percentage / 5) // 5% per block
+	if filled > barLength {
+		filled = barLength
+	}
+
+	var bar strings.Builder
+	bar.WriteString("`[")
+
+	for i := 0; i < barLength; i++ {
+		if i < filled {
+			bar.WriteString("█")
+		} else {
+			bar.WriteString("░")
+		}
+	}
+
+	bar.WriteString("]`")
+	return bar.String()
+}
+
+// formatFailureOutput formats test failure output with better visualization
+func formatFailureOutput(output []string) string {
+	var sb strings.Builder
+	var errorLines []string
+	var hasAssertion bool
+
+	// First pass: collect relevant lines and detect assertions
+	for _, line := range output {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		// Check for common failure patterns
+		if strings.Contains(line, "FAIL") || strings.Contains(line, "Error") ||
+			strings.Contains(line, "panic:") || strings.Contains(line, "--- FAIL") ||
+			strings.Contains(line, "expected") || strings.Contains(line, "actual") ||
+			strings.Contains(line, "got:") || strings.Contains(line, "want:") {
+			errorLines = append(errorLines, line)
+
+			// Detect assertion-style failures
+			if strings.Contains(strings.ToLower(line), "expected") ||
+				strings.Contains(strings.ToLower(line), "got:") ||
+				strings.Contains(strings.ToLower(line), "want:") {
+				hasAssertion = true
+			}
+		}
+	}
+
+	if len(errorLines) == 0 {
+		// If no specific error lines, show all output
+		errorLines = output
+	}
+
+	// Format the output
+	if hasAssertion {
+		sb.WriteString("<details>\n")
+		sb.WriteString("<summary>🔍 <b>Assertion Failure Details</b></summary>\n\n")
+		sb.WriteString("```diff\n")
+
+		for _, line := range errorLines {
+			// Highlight expected/actual differences
+			if strings.Contains(strings.ToLower(line), "expected") ||
+				strings.Contains(strings.ToLower(line), "want") {
+				sb.WriteString("- " + line + "\n")
+			} else if strings.Contains(strings.ToLower(line), "actual") ||
+				strings.Contains(strings.ToLower(line), "got") {
+				sb.WriteString("+ " + line + "\n")
+			} else if strings.Contains(line, "Error") || strings.Contains(line, "FAIL") {
+				sb.WriteString("! " + line + "\n")
+			} else {
+				sb.WriteString("  " + line + "\n")
+			}
+		}
+
+		sb.WriteString("```\n")
+		sb.WriteString("</details>\n\n")
+	} else {
+		// Standard error output
+		sb.WriteString("<details>\n")
+		sb.WriteString("<summary>🐛 <b>Error Details</b></summary>\n\n")
+		sb.WriteString("```go\n")
+
+		for _, line := range errorLines {
+			sb.WriteString(line + "\n")
+		}
+
+		sb.WriteString("```\n")
+		sb.WriteString("</details>\n\n")
+	}
 
 	return sb.String()
 }
